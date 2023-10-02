@@ -1,3 +1,5 @@
+import streamlit as st
+
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -12,6 +14,6 @@ options.add_argument('--disable-gpu')
 options.add_argument('--headless')
 
 driver = get_driver()
-driver.get("http://example.com")
+driver.get('http://example.com')
 
 st.code(driver.page_source)
