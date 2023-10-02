@@ -1,57 +1,36 @@
-# coding:utf-8
-
-# 必要なパッケージのインポート
 import streamlit as st
-from selenium import webdriver
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome import service as fs
-from selenium.webdriver import ChromeOptions
-from webdriver_manager.core.utils import ChromeType
-from selenium.webdriver.common.by import By
+import pandas as pd
+import numpy as np
 
-# タイトルを設定
-st.title("seleniumテストアプリ")
+st.title('Uber pickups in NYC')
 
-# ボタンを作成(このボタンをアプリ上で押すと"if press_button:"より下の部分が実行される)
-press_button = st.button("スクレイピング開始")
+DATE_COLUMN = 'date/time'
+DATA_URL = ('https://s3-us-west-2.amazonaws.com/'
+            'streamlit-demo-data/uber-raw-data-sep14.csv.gz')
 
-if press_button:
-    # スクレイピングするwebサイトのURL
-    URL = "https://ohenziblog.com"
+@st.cache_data
+def load_data(nrows):
+    data = pd.read_csv(DATA_URL, nrows=nrows)
+    lowercase = lambda x: str(x).lower()
+    data.rename(lowercase, axis='columns', inplace=True)
+    data[DATE_COLUMN] = pd.to_datetime(data[DATE_COLUMN])
+    return data
 
-    # ドライバのオプション
-    options = ChromeOptions()
+data_load_state = st.text('Loading data...')
+data = load_data(10000)
+data_load_state.text("Done! (using st.cache_data)")
 
-    # option設定を追加（設定する理由はメモリの削減）
-    options.add_argument("--headless")
-    options.add_argument('--disable-gpu')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
+if st.checkbox('Show raw data'):
+    st.subheader('Raw data')
+    st.write(data)
 
-    
-    CHROMEDRIVER = ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
-    service = fs.Service(CHROMEDRIVER)
-    driver = webdriver.Chrome(
-                              options=options,
-                              service=service
-                             )
+st.subheader('Number of pickups by hour')
+hist_values = np.histogram(data[DATE_COLUMN].dt.hour, bins=24, range=(0,24))[0]
+st.bar_chart(hist_values)
 
-    # URLで指定したwebページを開く
-    driver.get(URL)
+# Some number in the range 0-23
+hour_to_filter = st.slider('hour', 0, 23, 17)
+filtered_data = data[data[DATE_COLUMN].dt.hour == hour_to_filter]
 
-    # webページ上のタイトル画像を取得
-    img = driver.find_element(By.TAG_NAME, 'img')
-    src = img.get_attribute('src')
-
-    # 取得した画像をカレントディレクトリに保存
-    with open(f"tmp_img.png", "wb") as f:
-        f.write(img.screenshot_as_png)
-
-    # 保存した画像をstreamlitアプリ上に表示
-    st.image("tmp_img.png")
-
-    # webページを閉じる
-    driver.close()
-
-    # スクレピン完了したことをstreamlitアプリ上に表示する
-    st.write("スクレイピング完了!!!")
+st.subheader('Map of all pickups at %s:00' % hour_to_filter)
+st.map(filtered_data)
